@@ -1,6 +1,17 @@
 import numpy as np
 import sys
-print("start")
+import time
+import matplotlib.pyplot as plt
+
+timestart = time.perf_counter()
+
+def statement(statement):
+    print("------------------------------------")
+    print(str(statement))
+    print("------------------------------------")
+    return
+
+statement("start")
 #finished basic initialization
 
 #place filepaths here
@@ -17,6 +28,13 @@ fin.readline()
 # while not done parsing file
 done = False
 
+#setup lists
+all_ACPWRT = []
+all_DAY = []
+all_HOUR = []
+
+done = False
+
 # loop and read file
 while not done:
     line = fin.readline()
@@ -25,12 +43,74 @@ while not done:
         done = True
         continue
 
-        # format is date,county,state,fips,cases,deaths 
-        () = line.rstrip().split(",")
+    # prepare to pull out the parts I want
+    (POINT, DAY, HOUR, ACPWRT, DCVOLT, RESIST, TEMPER, VL1TO2, VL2TO3, VL3TO1, ACCUR1, ACCUR2, ACCUR3, ACVLT1, ACVLT2, ACVLT3, ACFRQ1, ACFRQ2, ACFRQ3, APPWR1, APPWR2, APPWR3, ACPWR1, ACPWR2, ACPWR3, REPWR1, REPWR2, REPWR3) = line.rstrip().split(",")
 
-        # clean up the data to remove empty entries
-        if cases=='':
-            cases=0
-        if deaths=='':
-            deaths=0
+    # clean up the data
+    if ACPWRT == '_':
+        ACPWRT = int(0)
+    if ACPWRT == '32767.0':
+        ACPWRT = int(0)
+    if ACPWRT == '0.0':
+        ACPWRT = int(0)
+
+    #collect parts into our lists
+    all_ACPWRT.append(float(ACPWRT))
+    all_DAY.append(((int(DAY[0:4]) - 2022) * 365 ) + int(DAY[4:]))
+    all_HOUR.append(HOUR)
+
+    if all_DAY[-1] > 800:
+        done = True
+
+
+"""
+#tools for inspecting our data
+with open("demofile.txt", "w") as f:
+  f.write('')
+
+for x in range(len(all_DAY)):
+    #if all_ACPWRT[x] == 0:
+    #    potato = 'yes'
+    #else:
+        with open("demofile.txt", "a") as f:
+            f.write(str(all_DAY[x]) + " " + str(all_ACPWRT[x]) + " \n")
+"""
+
+batching_ACPWRT = []
+Perday_ACPWRT = []
+dayswithpower = []
+startcounting = ""
+
+#calculating the total energy per day
+for x in range(len(all_ACPWRT)):
+    if all_ACPWRT[x] > 0:
+        startcounting = True
+        #kw*300 seconds = kJ
+        batching_ACPWRT.append(all_ACPWRT[x]*300)
+        #print('above 0')
+    if startcounting == True:
+        if all_ACPWRT[x] == 0:
+            Perday_ACPWRT.append(sum(batching_ACPWRT))
+            dayswithpower.append(all_DAY[x])
+            batching_ACPWRT = []
+            startcounting = False
+            #print('finished')
+
+#print((Perday_ACPWRT))
+#print((dayswithpower))
+
+#create graph of the data
+print('generating graph')
+plt.bar(dayswithpower, Perday_ACPWRT)
+plt.title('Solar Energy generated over longterm')
+plt.xlabel('Day (0 marks Jan 1 2022)')
+plt.ylabel('Energy per day (KJ)')
+plt.legend()
+plt.grid(True)
+
+timeend = time.perf_counter()
+print("took " + str(timeend - timestart) + " seconds to run.")
+
+plt.show()
+
 
