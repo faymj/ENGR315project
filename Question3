@@ -1,0 +1,96 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+from scipy.interpolate import CubicSpline
+
+
+def clean_sentinel(series: pd.Series) -> pd.Series:
+    numeric = pd.to_numeric(series, errors="coerce")
+    # sentinel values in these datasets are large (e.g. 32767); mask them
+    return numeric.mask(numeric > 32000)
+
+df = pd.read_csv("FPV_Altamonte_FL_data.csv")
+
+required_cols = ["FSTEMP", "ACPWRT", "FPOAI2"]
+
+for col in required_cols:
+    df[col] = clean_sentinel(df[col])
+
+# Build timestamps and merge all columns on nearest match (5 min tolerance)
+df['TIMESTAMP'] = pd.to_datetime(df['DAY'].astype(int).astype(str), format='%Y%j') + pd.to_timedelta(df['HOUR'])
+
+dfs = {}
+for col in required_cols:
+    dfs[col] = df.dropna(subset=[col, 'TIMESTAMP'])[['TIMESTAMP', col]].copy()
+    dfs[col] = dfs[col][dfs[col][col] != 0].dropna().sort_values('TIMESTAMP')
+
+plot_df = dfs['ACPWRT']
+for col in ['FSTEMP', 'FPOAI2']:
+    plot_df = pd.merge_asof(plot_df, dfs[col], on='TIMESTAMP', direction='nearest', tolerance=pd.Timedelta('5min'))
+plot_df = plot_df.dropna()
+
+plot_df['DAY'] = plot_df['TIMESTAMP'].dt.strftime('%Y%j').astype(int)
+plot_df['HOUR_FRAC'] = plot_df['TIMESTAMP'].dt.hour + plot_df['TIMESTAMP'].dt.minute / 60 + plot_df['TIMESTAMP'].dt.second / 3600
+
+time_window = plot_df[(plot_df['HOUR_FRAC'] >= 10) & (plot_df['HOUR_FRAC'] <= 16)].copy()
+
+if not time_window.empty:
+    daily_stats = time_window.groupby('DAY').agg({'FPOAI2': 'mean', 'FSTEMP': 'max', 'ACPWRT': 'mean'}).reset_index()
+    daily_stats = daily_stats[daily_stats['FSTEMP'] > 1.0]
+    
+    median_irr = daily_stats['FPOAI2'].median()
+    irr_lower, irr_upper = median_irr * 0.80, median_irr * 1.2
+    similar_irr_days = daily_stats[(daily_stats['FPOAI2'] >= irr_lower) & (daily_stats['FPOAI2'] <= irr_upper)].sort_values('FSTEMP')
+    
+    if len(similar_irr_days) >= 2:
+        hottest_day = similar_irr_days.iloc[-2]['DAY']
+        coolest_day = similar_irr_days.iloc[1]['DAY']
+        
+        hottest_data = time_window[time_window['DAY'] == hottest_day].sort_values('HOUR_FRAC')
+        coolest_data = time_window[time_window['DAY'] == coolest_day].sort_values('HOUR_FRAC')
+
+        hottest_stats = daily_stats[daily_stats['DAY'] == hottest_day].iloc[0]
+        coolest_stats = daily_stats[daily_stats['DAY'] == coolest_day].iloc[0]
+
+        print(f"Day with highest average panel temperature: { int(hottest_day) }\n\taverage irradiance = {hottest_stats['FPOAI2']:.2f} W/m²\n\tpeak panel temperature = {hottest_stats['FSTEMP']:.2f}°C\n\taverage AC power = {hottest_stats['ACPWRT']:.2f} kW")
+        print(f"Day with lowest average panel temperature: { int(coolest_day) }\n\taverage irradiance = {coolest_stats['FPOAI2']:.2f} W/m²\n\tpeak panel temperature = {coolest_stats['FSTEMP']:.2f}°C\n\taverage AC power = {coolest_stats['ACPWRT']:.2f} kW")
+
+        fig, axes = plt.subplots(1, 3, figsize=(21, 5))
+        x_hot = hottest_data['HOUR_FRAC'].values
+        x_cool = coolest_data['HOUR_FRAC'].values
+        x_fit = np.linspace(x_hot.min(), x_hot.max(), 200)
+        
+        # Temperature
+        y_hot = hottest_data['FSTEMP'].values
+        y_cool = coolest_data['FSTEMP'].values
+        axes[0].plot(x_fit, CubicSpline(x_hot, y_hot)(x_fit), color='red', linewidth=2.5, label=f'Hottest ({y_hot.max():.1f}°C)')
+        axes[0].plot(x_fit, CubicSpline(x_cool, y_cool)(x_fit), color='blue', linewidth=2.5, label=f'Coolest ({y_cool.max():.1f}°C)')
+        axes[0].set_ylabel('Temperature (°C)')
+        axes[0].set_title('Temperature')
+        axes[0].legend()
+        axes[0].grid(True, alpha=0.3)
+        
+        # AC Power
+        y_hot = hottest_data['ACPWRT'].values
+        y_cool = coolest_data['ACPWRT'].values
+        axes[1].plot(x_fit, CubicSpline(x_hot, y_hot)(x_fit), color='red', linewidth=2.5, label='Hottest')
+        axes[1].plot(x_fit, CubicSpline(x_cool, y_cool)(x_fit), color='blue', linewidth=2.5, label='Coolest')
+        axes[1].set_ylabel('AC Power (kW)')
+        axes[1].set_title('AC Power')
+        axes[1].legend()
+        axes[1].grid(True, alpha=0.3)
+        
+        # Irradiance
+        y_hot = hottest_data['FPOAI2'].values
+        y_cool = coolest_data['FPOAI2'].values
+        axes[2].plot(x_fit, CubicSpline(x_hot, y_hot)(x_fit), color='red', linewidth=2.5, label='Hottest')
+        axes[2].plot(x_fit, CubicSpline(x_cool, y_cool)(x_fit), color='blue', linewidth=2.5, label='Coolest')
+        axes[2].set_ylabel('Solar Irradiance (W/m²)')
+        axes[2].set_title('Total Solar Irradiance')
+        axes[2].legend()
+        axes[2].grid(True, alpha=0.3)
+        
+        for ax in axes:
+            ax.set_xlabel('Hour of Day')
+        plt.tight_layout()
+        plt.show()
