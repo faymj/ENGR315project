@@ -9,7 +9,7 @@ def clean_sentinel(series: pd.Series) -> pd.Series:
     # sentinel values in these datasets are large (e.g. 32767); mask them
     return numeric.mask(numeric > 32000)
 
-df = pd.read_csv("FPV_Altamonte_FL_data.csv")
+df = pd.read_csv("FPV_Oakville_CA_Inverter1_data.csv")
 
 required_cols = ["FSTEMP", "ACPWRT", "FPOAI2"]
 
