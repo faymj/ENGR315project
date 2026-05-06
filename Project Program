@@ -1,0 +1,225 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import time
+
+tm1 = time.perf_counter()
+
+## Load the dataset
+print('Loading dataset...')
+df = pd.read_csv('FPV_Oakville_CA_Inverter1_data.csv')
+
+## Clean the data
+## 32767 is an error code, \
+## so we need to replace it with 0 so our averages aren't ruined
+df['ACPWRT_clean'] = np.where(df['ACPWRT'] == 32767, 0, df['ACPWRT'])
+
+#Calculate Metrics
+daily_data = df.groupby('DAY')['ACPWRT_clean'].agg(
+    Daily_Peak = 'max',
+    Daily_Average='mean'
+).reset_index()
+
+#Filter out days where the panel produced 0 kW
+valid_days = daily_data[daily_data['Daily_Peak'] > 10]
+
+#Calculate final metrics for printout
+max_peak_ever = valid_days['Daily_Peak'].max()
+overall_avg_peak = valid_days['Daily_Peak'].mean()
+overall_avg_24h = valid_days['Daily_Average'].mean()
+
+#Print the metrics
+print("")
+print("------------------------------------")
+print("SOLAR PANEL OUTPUT METRICS (24-Hour)")
+print("------------------------------------")
+print(f"Absolute Maximum Peak Recorded: {max_peak_ever:.2f} kW")
+print(f"Average Dealy Peak Output: {overall_avg_peak:.2f} kW")
+print(f"Average 24-Hour Power Output: {overall_avg_24h:.2f} kW")
+print("")
+
+#Create the Histogram
+print("Generating Histogram...")
+plt.figure(figsize=(10, 6))
+
+#Plot the Daily Peaks
+plt.hist(valid_days['Daily_Peak'], bins=25, alpha=0.6, color='orange',
+         label='Daily Peak (kW)', edgecolor='black')
+
+#Plot the 24-Hour Averages
+plt.hist(valid_days['Daily_Average'], bins=25, alpha=0.6, color='blue',
+         label='24h Average (kW)', edgecolor='black')
+
+#Apply labels, titles, and units
+plt.title('Distribution of Daily Peak vs. 24-Hour Average Solar Output', fontsize=14)
+plt.xlabel('Power Output (kW)', fontsize=12)
+plt.ylabel('Number of Days (Frequency)', fontsize=12)
+
+#Add a legend and a gridto make it easy to read
+plt.legend()
+plt.grid(axis='y', linestyle='--', alpha=0.7)
+
+tm2 = time.perf_counter()
+
+plt.show()
+
+tm3 = time.perf_counter()
+
+plt.figure(figsize=(10,6))
+
+plt.plot(valid_days['DAY'], valid_days['Daily_Peak'], label='Daily Peak')
+plt.plot(valid_days['DAY'], valid_days['Daily_Average'], label='24h Average')
+
+plt.title('Solar Output Over Time')
+plt.xlabel('Day')
+plt.ylabel('Power (kW)')
+plt.legend()
+plt.grid(True)
+
+tm4 = time.perf_counter()
+
+plt.show()
+
+#END OF CLAYTONS WORK, BEGINNING OF MATHIAS WORK
+tm5 = time.perf_counter()
+import sys
+
+
+
+def linespacer():
+    print("------------------------------------")
+
+def statement(statement):
+    linespacer()
+    print(str(statement))
+    linespacer()
+    return
+
+statement("Evaluating valid datapoints, see below.")
+#finished basic initialization
+
+#place filepaths here
+file_path = "FPV_Oakville_CA_Inverter1_data.csv"
+try:
+    fin = open(file_path)
+except FileNotFoundError:
+    print('File ', file_path, ' not found. Exiting!')
+    sys.exit(-1)
+
+# get rid of the headers
+fin.readline()
+
+# while not done parsing file
+done = False
+
+#setup lists
+all_ACPWRT = []
+all_DAY = []
+all_HOUR = []
+
+done = False
+
+# loop and read file
+while not done:
+    line = fin.readline()
+
+    if line == '':
+        done = True
+        continue
+
+    # prepare to pull out the parts I want
+    (POINT, DAY, HOUR, ACPWRT, DCVOLT, RESIST, TEMPER, VL1TO2, VL2TO3, VL3TO1, ACCUR1, ACCUR2, ACCUR3, ACVLT1, ACVLT2, ACVLT3, ACFRQ1, ACFRQ2, ACFRQ3, APPWR1, APPWR2, APPWR3, ACPWR1, ACPWR2, ACPWR3, REPWR1, REPWR2, REPWR3) = line.rstrip().split(",")
+
+    # clean up the data
+    if ACPWRT == '_':
+        ACPWRT = int(0)
+    if ACPWRT == '32767.0':
+        ACPWRT = int(0)
+    if ACPWRT == '0.0':
+        ACPWRT = int(0)
+
+    #collect parts into our lists
+    all_ACPWRT.append(float(ACPWRT))
+    all_DAY.append(((int(DAY[0:4]) - 2022) * 365 ) + int(DAY[4:]))
+    all_HOUR.append(HOUR)
+
+    if all_DAY[-1] > 800:
+        done = True
+
+
+"""
+#tools for inspecting our data
+with open("demofile.txt", "w") as f:
+  f.write('')
+
+for x in range(len(all_DAY)):
+    #if all_ACPWRT[x] == 0:
+    #    potato = 'yes'
+    #else:
+        with open("demofile.txt", "a") as f:
+            f.write(str(all_DAY[x]) + " " + str(all_ACPWRT[x]) + " \n")
+"""
+
+batching_ACPWRT = []
+Perday_ACPWRT = [0]
+dayswithpower = [0]
+startcounting = ""
+
+"""
+all_DAY = All day values.
+all_ACPWRT = All power values, matching length of `all_DAY`
+batching_ACPWRT = list tracking the power generated every five minutes to esimtate energy gathered
+dayswithpower = The number of the day in which energy was generated and logged
+Perday_ACPWRT = The generated energy for that day
+"""
+
+#calculating the total energy per day, compiling list
+for x in range(len(all_ACPWRT)):
+    #case senario that there is power
+    if all_ACPWRT[x] > 0:
+        startcounting = True
+        #kw*300 seconds = kJ #this is assuming the time between things is five minutes.
+        batching_ACPWRT.append((all_ACPWRT[x]*300))
+    #case senario there is no power, so a day has ended. Calculate total energy gained.
+    if startcounting == True:
+        if all_ACPWRT[x] == 0:
+            #eject edge case values
+            if all_DAY[x] < dayswithpower[-1]:
+                batching_ACPWRT = []
+                break
+            #calculate total energy gained that day
+            else:
+                Perday_ACPWRT.append((sum(batching_ACPWRT)))
+                dayswithpower.append(all_DAY[x])
+                batching_ACPWRT = []
+                print('Day ' + str(dayswithpower[-1]) + ' gathered ' + str(Perday_ACPWRT[-1]) + 'kJ.')
+                startcounting = False
+
+statement('Finished gathering valid datapoints, ' + str(len(dayswithpower)) + ' days worth of valid data proccessed')
+print('Energy gathered STD is ' + str(np.std((Perday_ACPWRT))))
+#print(Perday_ACPWRT)
+print('Mean energy gathered per day is ' + str(np.mean((Perday_ACPWRT))) + 'kJ')
+linespacer()
+
+#create graph of the data to see where we have data
+print('generating graph')
+plt.figure(1)
+plt.bar(dayswithpower, Perday_ACPWRT,label = file_path)
+plt.title('Solar Energy generated over longterm')
+plt.xlabel('Day (0 marks Jan 1 2022)')
+plt.ylabel('Energy per day (KJ)')
+plt.legend()
+plt.grid(True)
+
+#generate a boxplot to see the distribution
+plt.figure(2)
+plt.boxplot(Perday_ACPWRT, showfliers = False)
+plt.title('Distribution of Peak and Low gather days')
+plt.ylabel('Energy per day (KJ)')
+
+tm6 = time.perf_counter()
+print("all tasks took " + str((tm2 - tm1) + (tm4 - tm3) + (tm6 - tm5)) + " seconds to run.")
+
+plt.show()
+
+
