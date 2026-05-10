@@ -6,7 +6,7 @@ It has been designed to read data from datasets:
 * FPV_Oakville_CA_Inverter1.csv
 * FPV_Altamonte_FL_data.csv
 
-The prior is primarily for considerations on solar power over time, and the latter is for comparisons on temperature and solar power output. These files are NOT provided on github due to their size, and you will need to download them and place them in the same folder as this program for it to work (or adjust path as neccesary) To adjust files being read, see lines 9 and 10 for variables ``file_path``, ``file_path2`` respectively.
+The prior is primarily for considerations on solar power over time, and the latter is for comparisons on temperature and solar power output. The latter file is NOT provided on github due to it's size, and you will need to download it and place it in the same folder as this program for it to work (or adjust path as neccesary). To adjust files being read, see lines 9 and 10 for variables ``file_path``, ``file_path2`` respectively.
 
 ### Important considerations:
 
