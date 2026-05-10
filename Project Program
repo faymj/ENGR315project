@@ -14,7 +14,7 @@ print('Loading dataset...')
 df = pd.read_csv(file_path)
 
 ## Clean the data
-## 32767 is an error code, \
+## 32767 is an error code, 
 ## so we need to replace it with 0 so our averages aren't ruined
 df['ACPWRT_clean'] = np.where(df['ACPWRT'] == 32767, 0, df['ACPWRT'])
 
@@ -68,7 +68,7 @@ tm2 = time.perf_counter()
 plt.show()
 
 tm3 = time.perf_counter()
-
+"""
 plt.figure(figsize=(10,6))
 
 plt.plot(valid_days['DAY'], valid_days['Daily_Peak'], label='Daily Peak')
@@ -79,12 +79,14 @@ plt.xlabel('Day')
 plt.ylabel('Power (kW)')
 plt.legend()
 plt.grid(True)
+plt.show()
+"""
 
 tm4 = time.perf_counter()
 
-plt.show()
 
-#END OF CLAYTONS WORK, BEGINNING OF MATHIAS WORK
+#End of Q1
+
 tm5 = time.perf_counter()
 import sys
 
@@ -222,7 +224,8 @@ tm6 = time.perf_counter()
 
 plt.show()
 
-#END OF MATHIAS WORK, BEGINNING OF TREVOR WORK
+#End of Q2
+
 tm7 = time.perf_counter()
 from scipy.interpolate import CubicSpline
 
@@ -319,3 +322,4 @@ if not time_window.empty:
         print("all tasks took " + str((tm2 - tm1) + (tm4 - tm3) + (tm6 - tm5) + (tm8 - tm7)) + " seconds to run.")
         plt.show()
 
+# End of Q3
